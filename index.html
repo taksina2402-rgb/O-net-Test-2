@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>AR Quiz: ระบบอวัยวะของมนุษย์และสิ่งมีชีวิต</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Kanit', sans-serif;
+      overflow-x: hidden;
+      background-color: #0f172a;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* AR HUD & Animations */
+    @keyframes float {
+      0%, 100% { transform: translateY(0px) rotate(0deg); }
+      50% { transform: translateY(-10px) rotate(2deg); }
+    }
+    @keyframes pulse-ring {
+      0% { transform: scale(0.85); opacity: 0.8; }
+      50% { transform: scale(1.05); opacity: 0.4; }
+      100% { transform: scale(0.85); opacity: 0.8; }
+    }
+
+    .ar-float {
+      animation: float 3.5s ease-in-out infinite;
+    }
+    .ar-ring {
+      animation: pulse-ring 3s infinite ease-in-out;
+    }
+
+    /* Glassmorphism AR Cards */
+    .ar-glass {
+      background: rgba(15, 23, 42, 0.72);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45), inset 0 0 15px rgba(56, 189, 248, 0.1);
+    }
+
+    .ar-option {
+      background: rgba(30, 41, 59, 0.82);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .ar-option:hover:not(:disabled) {
+      background: rgba(14, 165, 233, 0.25);
+      border-color: #38bdf8;
+      transform: translateY(-2px);
+    }
+    .ar-option:active:not(:disabled) {
+      transform: scale(0.98);
+    }
+
+    /* Animated Virtual Lab Background (Fallback when camera is off/denied) */
+    .virtual-ar-bg {
+      background: radial-gradient(circle at 50% 30%, #1e3a8a 0%, #0f172a 65%, #020617 100%);
+      background-image: 
+        linear-gradient(rgba(56, 189, 248, 0.07) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(56, 189, 248, 0.07) 1px, transparent 1px),
+        radial-gradient(circle at 50% 30%, #1e3a8a 0%, #0f172a 70%);
+      background-size: 40px 40px, 40px 40px, 100% 100%;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); }
+    ::-webkit-scrollbar-thumb { background: rgba(56, 189, 248, 0.5); border-radius: 3px; }
+  </style>
+</head>
+<body class="text-white min-h-screen relative">
+
+  <!-- Background Video for Real AR Camera -->
+  <video id="ar-camera" autoplay playsinline muted class="fixed inset-0 w-full h-full object-cover z-0 hidden"></video>
+  
+  <!-- Virtual AR Grid Background (Fallback / Default) -->
+  <div id="virtual-bg" class="fixed inset-0 virtual-ar-bg z-0"></div>
+
+  <!-- AR Scanner Overlay Corners -->
+  <div class="fixed inset-0 pointer-events-none z-10 overflow-hidden">
+    <div class="absolute top-3 left-3 w-8 h-8 border-t-2 border-l-2 border-cyan-400/70 rounded-tl-lg"></div>
+    <div class="absolute top-3 right-3 w-8 h-8 border-t-2 border-r-2 border-cyan-400/70 rounded-tr-lg"></div>
+    <div class="absolute bottom-3 left-3 w-8 h-8 border-b-2 border-l-2 border-cyan-400/70 rounded-bl-lg"></div>
+    <div class="absolute bottom-3 right-3 w-8 h-8 border-b-2 border-r-2 border-cyan-400/70 rounded-br-lg"></div>
+  </div>
+
+  <!-- Main App Container -->
+  <div id="app" class="relative z-20 min-h-screen flex flex-col justify-between p-4 max-w-2xl mx-auto">
+
+    <!-- ==================== START SCREEN ==================== -->
+    <div id="start-screen" class="my-auto py-6 flex flex-col items-center text-center space-y-6">
+      <div class="relative">
+        <div class="w-28 h-28 rounded-full bg-cyan-500/20 border-2 border-cyan-400 flex items-center justify-center ar-ring">
+          <span class="text-6xl ar-float">🫀</span>
+        </div>
+        <span class="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-cyan-500 text-slate-950 text-xs font-bold px-3 py-0.5 rounded-full tracking-wider uppercase shadow-lg">
+          AR BIO-SCANNER
+        </span>
+      </div>
+
+      <div class="space-y-2">
+        <h1 class="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-cyan-300 via-sky-400 to-indigo-300 bg-clip-text text-transparent">
+          ตะลุยระบบอวัยวะของมนุษย์
+        </h1>
+        <p class="text-slate-300 text-sm sm:text-base max-w-md mx-auto">
+          แบบทดสอบ AR เชิงโต้ตอบ อ้างอิงเนื้อหาสิ่งมีชีวิตและกระบวนการดำรงชีวิต (แนวข้อสอบ O-NET)
+        </p>
+      </div>
+
+      <!-- Rules Card -->
+      <div class="ar-glass rounded-2xl p-5 w-full text-left space-y-3 text-sm sm:text-base">
+        <div class="font-semibold text-cyan-300 flex items-center gap-2 border-b border-slate-700 pb-2">
+          <span>📋</span> กติกาและระบบคะแนน AR
+        </div>
+        <ul class="space-y-2 text-slate-200 text-sm">
+          <li class="flex items-start gap-2">
+            <span class="text-cyan-400 font-bold">•</span>
+            <span>ข้อสอบ 4 ตัวเลือก จำนวน <b>20 ข้อ</b> (ไล่ระดับจากง่ายไปยาก)</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="text-amber-400 font-bold">•</span>
+            <span>จับเวลา <b>ข้อละ 1 นาที (60 วินาที)</b></span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="text-emerald-400 font-bold">•</span>
+            <span><b>คะแนนโบนัส:</b> ตอบถูกได้ 100 คะแนน + โบนัสความเร็ว (สูงสุด +50 คะแนน) + โบนัสตอบถูกต่อเนื่อง (Combo)!</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="text-purple-400 font-bold">•</span>
+            <span><b>สุ่มใหม่ทุกครั้ง:</b> สลับลำดับข้อและสลับตำแหน่งตัวเลือกทุกครั้งที่เริ่มสอบใหม่</span>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Camera Toggle & Start Buttons -->
+      <div class="w-full space-y-3">
+        <button id="btn-start-ar" class="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-lg shadow-lg shadow-cyan-500/30 transition transform active:scale-95 flex items-center justify-center gap-2">
+          <span>📷</span> เปิดกล้อง AR และเริ่มทำข้อสอบ
+        </button>
+        <button id="btn-start-virtual" class="w-full py-3 px-6 rounded-2xl ar-glass hover:bg-slate-800/80 text-cyan-300 font-medium text-sm transition flex items-center justify-center gap-2">
+          <span>🌐</span> เล่นในโหมดจำลอง AR (ไม่ใช้กล้อง)
+        </button>
+      </div>
+    </div>
+
+    <!-- ==================== QUIZ SCREEN ==================== -->
+    <div id="quiz-screen" class="hidden flex-col justify-between min-h-[92vh] py-2 space-y-3">
+      
+      <!-- Top HUD Bar -->
+      <div class="ar-glass rounded-2xl p-3 flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <span id="question-counter" class="bg-cyan-500/20 border border-cyan-400/50 text-cyan-300 font-bold px-3 py-1 rounded-xl text-sm">
+            ข้อที่ 1 / 20
+          </span>
+          <span id="difficulty-badge" class="bg-emerald-500/20 border border-emerald-400/50 text-emerald-300 px-2.5 py-1 rounded-xl text-xs font-medium">
+            ระดับ: ง่าย
+          </span>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <!-- Combo Badge -->
+          <div id="combo-badge" class="hidden bg-amber-500/20 border border-amber-400 text-amber-300 px-2.5 py-1 rounded-xl text-xs font-bold animate-bounce">
+            🔥 Combo x2
+          </div>
+          <!-- Score -->
+          <div class="text-right">
+            <div class="text-[10px] text-slate-400 uppercase tracking-wider">คะแนนสะสม</div>
+            <div id="score-display" class="text-lg font-bold text-amber-400 leading-none">0</div>
+          </div>
+          <!-- Camera Toggle Button -->
+          <button id="btn-toggle-cam" title="สลับกล้อง AR" class="p-2 rounded-xl bg-slate-800/80 border border-slate-600 text-cyan-300 hover:bg-slate-700 text-sm">
+            📷
+          </button>
+        </div>
+
+        <!-- Timer Bar -->
+        <div class="w-full mt-1">
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-slate-300 flex items-center gap-1">⏱️ เวลาที่เหลือ</span>
+            <span id="timer-text" class="font-bold text-cyan-300">60 วินาที</span>
+          </div>
+          <div class="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-700">
+            <div id="timer-bar" class="h-full bg-gradient-to-r from-emerald-400 via-cyan-400 to-blue-500 rounded-full transition-all duration-1000 ease-linear" style="width: 100%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AR 3D Hologram Organ Stage -->
+      <div class="relative flex flex-col items-center justify-center py-2 my-1">
+        <div class="relative w-28 h-28 sm:w-32 sm:h-32 flex items-center justify-center">
+          <!-- Hologram Rings -->
+          <div class="absolute inset-0 rounded-full border-2 border-dashed border-cyan-400/40 animate-spin" style="animation-duration: 14s;"></div>
+          <div class="absolute inset-2 rounded-full border border-sky-300/30 ar-ring"></div>
+          <!-- Hologram Base Glow -->
+          <div class="absolute -bottom-2 w-24 h-4 bg-cyan-400/30 blur-md rounded-full"></div>
+          <!-- Organ Emoji / Model -->
+          <div id="ar-hologram-icon" class="text-6xl sm:text-7xl ar-float drop-shadow-[0_0_15px_rgba(56,189,248,0.8)]">
+            🫀
+          </div>
+        </div>
+        <span id="ar-system-label" class="mt-2 px-3 py-0.5 rounded-full bg-slate-900/80 border border-cyan-500/40 text-cyan-300 text-xs font-medium tracking-wide">
+          ระบบอวัยวะของมนุษย์
+        </span>
+      </div>
+
+      <!-- Question & Options Card -->
+      <div class="ar-glass rounded-2xl p-4 sm:p-5 space-y-4 shadow-2xl">
+        <h2 id="question-text" class="text-base sm:text-lg font-semibold text-white leading-relaxed">
+          กำลังโหลดคำถาม...
+        </h2>
+
+        <!-- 4 Options Grid -->
+        <div id="options-container" class="grid grid-cols-1 gap-2.5">
+          <!-- Options injected via JS -->
+        </div>
+
+        <!-- Feedback & Next Button Area -->
+        <div id="feedback-area" class="hidden pt-2 border-t border-slate-700/80 space-y-3">
+          <div id="feedback-box" class="p-3 rounded-xl text-sm">
+            <div id="feedback-title" class="font-bold text-base mb-1"></div>
+            <div id="feedback-bonus" class="text-xs font-semibold text-amber-300 mb-1"></div>
+            <p id="feedback-rationale" class="text-slate-200 text-xs sm:text-sm leading-relaxed"></p>
+          </div>
+          <button id="btn-next" class="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold shadow-lg transition">
+            ข้อถัดไป ➡️
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== RESULT SCREEN ==================== -->
+    <div id="result-screen" class="hidden my-auto py-6 flex-col items-center text-center space-y-5">
+      <div class="ar-glass rounded-3xl p-6 w-full space-y-5">
+        <div class="space-y-1">
+          <div id="result-medal" class="text-6xl mb-2 ar-float">🏆</div>
+          <h2 class="text-2xl sm:text-3xl font-bold text-cyan-300">สรุปผลการทดสอบ AR</h2>
+          <p id="result-rank" class="text-sm text-amber-300 font-medium">สุดยอดนักชีววิทยารุ่นเยาว์!</p>
+        </div>
+
+        <!-- Main Score Box -->
+        <div class="bg-slate-900/80 border border-cyan-500/30 rounded-2xl p-4">
+          <div class="text-xs text-slate-400 uppercase tracking-wider">คะแนนรวมทั้งหมด (รวมโบนัส)</div>
+          <div id="final-total-score" class="text-4xl sm:text-5xl font-extrabold text-transparent bg-gradient-to-r from-amber-300 via-yellow-400 to-orange-400 bg-clip-text my-1">
+            0
+          </div>
+          <div class="text-xs text-slate-400">คะแนนเต็มสูงสุด 3,550 คะแนน</div>
+        </div>
+
+        <!-- Stats Breakdown -->
+        <div class="grid grid-cols-3 gap-2 text-center">
+          <div class="bg-slate-800/70 rounded-xl p-3 border border-slate-700">
+            <div class="text-xs text-slate-400">ตอบถูก</div>
+            <div id="stat-correct" class="text-lg font-bold text-emerald-400">0 / 20</div>
+          </div>
+          <div class="bg-slate-800/70 rounded-xl p-3 border border-slate-700">
+            <div class="text-xs text-slate-400">คะแนนพื้นฐาน</div>
+            <div id="stat-base" class="text-lg font-bold text-cyan-300">0</div>
+          </div>
+          <div class="bg-slate-800/70 rounded-xl p-3 border border-slate-700">
+            <div class="text-xs text-slate-400">คะแนนโบนัส</div>
+            <div id="stat-bonus" class="text-lg font-bold text-amber-400">+0</div>
+          </div>
+        </div>
+
+        <!-- Review Wrong/All Answers Accordion -->
+        <div class="text-left space-y-2">
+          <h3 class="text-sm font-semibold text-cyan-300 border-b border-slate-700 pb-1">
+            📝 สรุปทบทวนคำตอบรายข้อ
+          </h3>
+          <div id="review-list" class="max-h-60 overflow-y-auto space-y-2 pr-1 text-xs">
+            <!-- Review items injected here -->
+          </div>
+        </div>
+
+        <!-- Restart Button -->
+        <button id="btn-restart" class="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-lg shadow-lg shadow-emerald-500/25 transition transform active:scale-95 flex items-center justify-center gap-2">
+          <span>🔄</span> ทำข้อสอบใหม่อีกครั้ง (สลับข้อและตัวเลือก)
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // ==========================================
+    // 1. คลังข้อสอบ 20 ข้อ (อ้างอิงเนื้อหา 100%)
+    // เรียงระดับความยาก: ข้อ 1-7 (ง่าย), ข้อ 8-14 (ปานกลาง), ข้อ 15-20 (ยาก/วิเคราะห์ O-NET)
+    // ==========================================
+    const rawQuestions = [
+      // --- ระดับง่าย (Easy: 1 - 7) ---
+      {
+        id: 1,
+        difficulty: "ง่าย",
+        system: "2.3.1 ระบบย่อยอาหาร",
+        icon: "👄",
+        question: "อวัยวะใดทำหน้าที่ 'ดูดซึมสารอาหารมากที่สุด' ในระบบย่อยอาหาร?",
+        options: ["ลำไส้เล็ก", "กระเพาะอาหาร", "ลำไส้ใหญ่", "หลอดอาหาร"],
+        correctIndex: 0,
+        rationale: "ลำไส้เล็กทำหน้าที่ย่อยอาหารทุกประเภทและดูดซึมสารอาหารเข้าสู่กระแสเลือดมากที่สุด"
+      },
+      {
+        id: 2,
+        difficulty: "ง่าย",
+        system: "2.3.1 ระบบย่อยอาหาร",
+        icon: "💧",
+        question: "อวัยวะใดในระบบย่อยอาหารทำหน้าที่หลักในการ 'ดูดซึมน้ำ' ออกจากกากอาหาร?",
+        options: ["ลำไส้ใหญ่", "ลำไส้เล็ก", "กระเพาะอาหาร", "ปาก"],
+        correctIndex: 0,
+        rationale: "ลำไส้ใหญ่ไม่มีการย่อยอาหาร แต่ทำหน้าที่หลักในการดูดซึมน้ำและเกลือแร่กลับเข้าสู่ร่างกาย"
+      },
+      {
+        id: 3,
+        difficulty: "ง่าย",
+        system: "2.3.1 ระบบย่อยอาหาร",
+        icon: "🍚",
+        question: "การย่อยอาหารเริ่มต้นที่อวัยวะใด โดยมีการเคี้ยวร่วมกับน้ำลายช่วยย่อยแป้ง?",
+        options: ["ปาก", "หลอดอาหาร", "กระเพาะอาหาร", "ลำไส้เล็ก"],
+        correctIndex: 0,
+        rationale: "ในปากมีฟันช่วยบดเคี้ยวอาหาร และมีเอนไซม์ในน้ำลายช่วยย่อยสารอาหารประเภทแป้งเป็นอันดับแรก"
+      },
+      {
+        id: 4,
+        difficulty: "ง่าย",
+        system: "2.3.2 ระบบหายใจ",
+        icon: "🫁",
+        question: "หน้าที่หลักของระบบหายใจคือข้อใด?",
+        options: ["รับแก๊สออกซิเจน และขับแก๊สคาร์บอนไดออกไซด์", "ลำเลียงสารอาหารไปเลี้ยงส่วนต่างๆ ของร่างกาย", "ย่อยอาหารให้มีขนาดเล็กลงเพื่อดูดซึม", "ควบคุมลักษณะทางพันธุกรรมของสิ่งมีชีวิต"],
+        correctIndex: 0,
+        rationale: "ระบบหายใจทำหน้าที่แลกเปลี่ยนแก๊ส โดยนำแก๊สออกซิเจนเข้าสู่ร่างกายและขับแก๊สคาร์บอนไดออกไซด์ออก"
+      },
+      {
+        id: 5,
+        difficulty: "ง่าย",
+        system: "2.3.3 ระบบไหลเวียนเลือด",
+        icon: "🫀",
+        question: "ข้อใดคือส่วนประกอบสำคัญของระบบไหลเวียนเลือด?",
+        options: ["หัวใจ เลือด หลอดเลือด", "จมูก หลอดลม ปอด", "ปาก กระเพาะอาหาร ลำไส้", "ยีน โครโมโซม เซลล์สืบพันธุ์"],
+        correctIndex: 0,
+        rationale: "ระบบไหลเวียนเลือดประกอบด้วยอวัยวะสำคัญ 3 ส่วน ได้แก่ หัวใจ เลือด และหลอดเลือด"
+      },
+      {
+        id: 6,
+        difficulty: "ง่าย",
+        system: "2.4 การสืบพันธุ์ของสิ่งมีชีวิต",
+        icon: "🦠",
+        question: "การสืบพันธุ์แบบใดที่ทำให้สิ่งมีชีวิตสามารถ 'เพิ่มจำนวนได้รวดเร็ว' และลูกมีลักษณะเหมือนเดิมทุกประการ?",
+        options: ["การสืบพันธุ์แบบไม่อาศัยเพศ", "การสืบพันธุ์แบบอาศัยเพศ", "การปฏิสนธิของเซลล์สืบพันธุ์", "การถ่ายทอดลักษณะเด่น"],
+        correctIndex: 0,
+        rationale: "การสืบพันธุ์แบบไม่อาศัยเพศใช้พ่อแม่เพียงตัวเดียว เช่น การแตกหน่อ แบ่งตัว จึงเพิ่มจำนวนได้รวดเร็วและลูกเหมือนเดิมทุกประการ"
+      },
+      {
+        id: 7,
+        difficulty: "ง่าย",
+        system: "2.5 การถ่ายทอดลักษณะทางพันธุกรรม",
+        icon: "🧬",
+        question: "หน่วยควบคุมลักษณะทางพันธุกรรมที่อยู่บนโครโมโซมเรียกว่าอะไร?",
+        options: ["ยีน (Gene)", "ถุงลม (Alveoli)", "หลอดเลือด", "เซลล์เม็ดเลือด"],
+        correctIndex: 0,
+        rationale: "ยีน (Gene) คือหน่วยควบคุมลักษณะทางพันธุกรรมที่อยู่บนโครโมโซม ถ่ายทอดจากพ่อแม่สู่ลูก"
+      },
+
+      // --- ระดับปานกลาง (Medium: 8 - 14) ---
+      {
+        id: 8,
+        difficulty: "ปานกลาง",
+        system: "2.3.1 ระบบย่อยอาหาร",
+        icon: "🥩",
+        question: "ข้อใดเรียงลำดับทางเดินอาหารในระบบย่อยอาหารของมนุษย์ได้ถูกต้อง?",
+        options: [
+          "ปาก → หลอดอาหาร → กระเพาะอาหาร → ลำไส้เล็ก → ลำไส้ใหญ่ → ทวารหนัก",
+          "ปาก → กระเพาะอาหาร → หลอดอาหาร → ลำไส้เล็ก → ลำไส้ใหญ่ → ทวารหนัก",
+          "ปาก → หลอดอาหาร → ลำไส้เล็ก → กระเพาะอาหาร → ลำไส้ใหญ่ → ทวารหนัก",
+          "ปาก → หลอดอาหาร → กระเพาะอาหาร → ลำไส้ใหญ่ → ลำไส้เล็ก → ทวารหนัก"
+        ],
+        correctIndex: 0,
+        rationale: "ลำดับทางเดินอาหารที่ถูกต้องคือ ปาก → หลอดอาหาร → กระเพาะอาหาร → ลำไส้เล็ก → ลำไส้ใหญ่ → ทวารหนัก"
+      },
+      {
+        id: 9,
+        difficulty: "ปานกลาง",
+        system: "2.3.1 ระบบย่อยอาหาร",
+        icon: "🍗",
+        question: "หากรับประทานเนื้อสัตว์ซึ่งมีสารอาหารประเภทโปรตีนสูง การย่อยโปรตีนจะเริ่มต้นขึ้นที่อวัยวะใด?",
+        options: ["กระเพาะอาหาร", "ปาก", "หลอดอาหาร", "ลำไส้ใหญ่"],
+        correctIndex: 0,
+        rationale: "ในปากย่อยเฉพาะแป้ง ส่วนการย่อยโปรตีนจะเริ่มต้นขึ้นที่กระเพาะอาหาร"
+      },
+      {
+        id: 10,
+        difficulty: "ปานกลาง",
+        system: "2.3.2 ระบบหายใจ",
+        icon: "🌬️",
+        question: "ข้อใดเรียงลำดับเส้นทางเดินของอากาศเมื่อเราหายใจเข้าได้ถูกต้อง?",
+        options: [
+          "จมูก → หลอดลม → ปอด → ถุงลม",
+          "จมูก → ปอด → หลอดลม → ถุงลม",
+          "ปาก → หลอดอาหาร → ปอด → ถุงลม",
+          "จมูก → ถุงลม → หลอดลม → ปอด"
+        ],
+        correctIndex: 0,
+        rationale: "อากาศจะเข้าสู่ร่างกายตามลำดับคือ จมูก → หลอดลม → ปอด → ถุงลม"
+      },
+      {
+        id: 11,
+        difficulty: "ปานกลาง",
+        system: "2.3.2 ระบบหายใจ",
+        icon: "🫧",
+        question: "บริเวณใดในปอดที่เป็นจุดแลกเปลี่ยนแก๊สโดยตรง และมีโครงสร้างเหมาะสมอย่างไร?",
+        options: [
+          "ถุงลม เพราะมีผนังบางทำให้แก๊สแพร่ผ่านได้ง่าย",
+          "หลอดลม เพราะมีกระดูกอ่อนแข็งแรงช่วยดันแก๊ส",
+          "จมูก เพราะมีขนจมูกช่วยกรองแก๊สออกซิเจน",
+          "กะบังลม เพราะมีกล้ามเนื้อหนาช่วยดูดซึมแก๊ส"
+        ],
+        correctIndex: 0,
+        rationale: "ถุงลมเป็นที่แลกเปลี่ยนแก๊ส โดยมีลักษณะสำคัญคือผนังถุงลมบางมาก ทำให้แก๊สผ่านเข้าออกได้ง่าย"
+      },
+      {
+        id: 12,
+        difficulty: "ปานกลาง",
+        system: "2.4 การสืบพันธุ์ของสิ่งมีชีวิต",
+        icon: "🌱",
+        question: "การแตกหน่อของไฮดราและการแบ่งตัวของอะมีบา จัดเป็นการสืบพันธุ์รูปแบบใด?",
+        options: [
+          "การสืบพันธุ์แบบไม่อาศัยเพศ",
+          "การสืบพันธุ์แบบอาศัยเพศ",
+          "การสืบพันธุ์ที่ต้องอาศัยเซลล์สืบพันธุ์",
+          "การสืบพันธุ์ที่ทำให้เกิดความหลากหลายทางพันธุกรรม"
+        ],
+        correctIndex: 0,
+        rationale: "การแตกหน่อและการแบ่งตัว เป็นตัวอย่างของการสืบพันธุ์แบบไม่อาศัยเพศ ใช้พ่อแม่เพียงตัวเดียว"
+      },
+      {
+        id: 13,
+        difficulty: "ปานกลาง",
+        system: "2.4 การสืบพันธุ์ของสิ่งมีชีวิต",
+        icon: "👨‍👩‍👧‍👦",
+        question: "การสืบพันธุ์แบบใดที่ช่วยให้สิ่งมีชีวิต 'เกิดความหลากหลายทางพันธุกรรม' และลูกมีลักษณะแตกต่างกัน?",
+        options: [
+          "การสืบพันธุ์แบบอาศัยเพศ",
+          "การสืบพันธุ์แบบไม่อาศัยเพศ",
+          "การแบ่งตัวของสิ่งมีชีวิตเซลล์เดียว",
+          "การแตกหน่อจากต้นแม่"
+        ],
+        correctIndex: 0,
+        rationale: "การสืบพันธุ์แบบอาศัยเพศมีการรวมกันของเซลล์สืบพันธุ์ ทำให้ลูกมีลักษณะแตกต่างกัน เกิดความหลากหลายทางพันธุกรรม"
+      },
+      {
+        id: 14,
+        difficulty: "ปานกลาง",
+        system: "2.5 การถ่ายทอดลักษณะทางพันธุกรรม",
+        icon: "🧬",
+        question: "ลักษณะด้อยทางพันธุกรรมจะแสดงออกมาให้เห็นในรุ่นลูกได้เมื่อใด?",
+        options: [
+          "เมื่อไม่มียีนลักษณะเด่นข่มอยู่",
+          "เมื่อได้รับยีนลักษณะเด่นมาจากพ่อ",
+          "เมื่อได้รับยีนลักษณะเด่นมาจากแม่",
+          "เมื่อสิ่งมีชีวิตสืบพันธุ์แบบไม่อาศัยเพศ"
+        ],
+        correctIndex: 0,
+        rationale: "ลักษณะเด่นจะแสดงออกได้ง่าย ส่วนลักษณะด้อยจะแสดงออกได้ก็ต่อเมื่อไม่มียีนลักษณะเด่นอยู่ด้วยเท่านั้น"
+      },
+
+      // --- ระดับยาก / วิเคราะห์ O-NET (Hard: 15 - 20) ---
+      {
+        id: 15,
+        difficulty: "ยาก (วิเคราะห์)",
+        system: "2.3.2 ระบบหายใจ",
+        icon: "⚠️",
+        question: "หากผู้ป่วยมีภาวะผิดปกติที่ทำให้ 'ผนังถุงลมในปอดหนาขึ้น' จะส่งผลกระทบต่อร่างกายอย่างไร?",
+        options: [
+          "แลกเปลี่ยนแก๊สได้น้อยลง ร่างกายได้รับออกซิเจนไม่เพียงพอ",
+          "แลกเปลี่ยนแก๊สได้เร็วขึ้น เพราะถุงลมกักเก็บอากาศได้มากขึ้น",
+          "ระบบย่อยอาหารดูดซึมสารอาหารได้เพิ่มขึ้นเพื่อชดเชย",
+          "ปอดขยายตัวได้ใหญ่ขึ้นและขับคาร์บอนไดออกไซด์ได้ดีขึ้น"
+        ],
+        correctIndex: 0,
+        rationale: "ปกติผนังถุงลมต้องบางเพื่อให้แก๊สผ่านได้ง่าย หากผนังถุงลมหนาขึ้น การแพร่ของแก๊สจะทำได้ยากและแลกเปลี่ยนแก๊สได้น้อยลง"
+      },
+      {
+        id: 16,
+        difficulty: "ยาก (วิเคราะห์)",
+        system: "2.3.3 ระบบไหลเวียนเลือด",
+        icon: "🩸",
+        question: "หากระบบไหลเวียนเลือดทำงานผิดปกติ ระบบอวัยวะใดในร่างกายจะได้รับผลกระทบมากที่สุด?",
+        options: [
+          "ทุกระบบในร่างกาย เพราะเลือดทำหน้าที่ลำเลียงออกซิเจนและสารอาหารไปเลี้ยงทุกส่วน",
+          "เฉพาะระบบย่อยอาหาร เพราะกระเพาะอาหารไม่มีเลือดไปหล่อเลี้ยง",
+          "เฉพาะระบบหายใจ เพราะปอดไม่สามารถรับอากาศจากจมูกได้",
+          "เฉพาะระบบสืบพันธุ์ เพราะเซลล์สืบพันธุ์ไม่สามารถแบ่งตัวได้"
+        ],
+        correctIndex: 0,
+        rationale: "แนวข้อสอบเชิงเหตุผล: เลือดไปเลี้ยงทุกส่วนของร่างกาย เพื่อส่งออกซิเจน สารอาหาร และขับของเสีย ดังนั้นทุกระบบจึงได้รับผลกระทบ"
+      },
+      {
+        id: 17,
+        difficulty: "ยาก (บูรณาการ)",
+        system: "2.3.4 ความสัมพันธ์ของระบบต่างๆ",
+        icon: "⚡",
+        question: "เซลล์ในร่างกายจะสร้างพลังงานได้ ต้องอาศัยการทำงานสัมพันธ์กันของระบบใดบ้างตามหลักการบูรณาการ?",
+        options: [
+          "ระบบหายใจให้ออกซิเจน + ระบบย่อยอาหารให้สารอาหาร + ระบบไหลเวียนเลือดลำเลียงไปสู่เซลล์",
+          "ระบบย่อยอาหารให้ออกซิเจน + ระบบหายใจให้โปรตีน + ระบบสืบพันธุ์สร้างพลังงาน",
+          "ระบบไหลเวียนเลือดย่อยแป้ง + ระบบหายใจดูดซึมน้ำ + ระบบย่อยอาหารขับแก๊ส",
+          "ระบบหายใจและระบบย่อยอาหารทำงานแยกกันโดยไม่เกี่ยวข้องกับระบบไหลเวียนเลือด"
+        ],
+        correctIndex: 0,
+        rationale: "แนวคิดหลัก O-NET: ระบบหายใจให้ออกซิเจน ระบบย่อยอาหารให้พลังงาน/สารอาหาร และระบบไหลเวียนเลือดทำหน้าที่ลำเลียงไปเลี้ยงทั่วร่างกาย"
+      },
+      {
+        id: 18,
+        difficulty: "ยาก (วิเคราะห์)",
+        system: "2.3.1 ระบบย่อยอาหาร",
+        icon: "🏥",
+        question: "ผู้ป่วยที่ได้รับการผ่าตัดตัด 'ลำไส้เล็ก' ออกไปบางส่วน จะประสบปัญหาสุขภาพในด้านใดมากที่สุด?",
+        options: [
+          "ร่างกายขาดสารอาหารและน้ำหนักลดลง เนื่องจากพื้นที่ดูดซึมสารอาหารลดลง",
+          "ไม่สามารถบดเคี้ยวอาหารประเภทแป้งในช่องปากได้ตามปกติ",
+          "กากอาหารเหลวเป็นน้ำมากเกินไป เพราะไม่มีอวัยวะดูดซึมน้ำ",
+          "ไม่สามารถกลืนอาหารจากหลอดอาหารลงสู่กระเพาะอาหารได้"
+        ],
+        correctIndex: 0,
+        rationale: "ลำไส้เล็กเป็นอวัยวะที่ดูดซึมสารอาหารมากที่สุด หากลำไส้เล็กสั้นลง ประสิทธิภาพการดูดซึมสารอาหารเข้าสู่ร่างกายจะลดลง"
+      },
+      {
+        id: 19,
+        difficulty: "ยาก (วิเคราะห์)",
+        system: "2.5 การถ่ายทอดลักษณะทางพันธุกรรม",
+        icon: "🧬",
+        question: "พ่อและแม่ต่างมีลักษณะภายนอกเป็น 'ลักษณะเด่น' ทั้งคู่ แต่ลูกที่เกิดมามี 'ลักษณะด้อย' ข้อใดอธิบายเหตุการณ์นี้ได้ถูกต้อง?",
+        options: [
+          "พ่อและแม่ต่างมียีนลักษณะด้อยแฝงอยู่ และถ่ายทอดยีนด้อยนั้นมาให้ลูกพร้อมกัน",
+          "ลักษณะด้อยสามารถข่มลักษณะเด่นของพ่อและแม่ได้ในรุ่นลูก",
+          "เกิดจากการสืบพันธุ์แบบไม่อาศัยเพศที่ทำให้ลูกต่างจากพ่อแม่",
+          "ยีนของพ่อแม่เกิดการสูญหายขณะลำเลียงผ่านระบบไหลเวียนเลือด"
+        ],
+        correctIndex: 0,
+        rationale: "พ่อแม่ที่แสดงลักษณะเด่นอาจมียีนด้อยแฝงอยู่ เมื่อลูกได้รับยีนด้อยจากทั้งพ่อและแม่ (ไม่มียีนเด่นอยู่เลย) ลักษณะด้อยจึงแสดงออกมาได้"
+      },
+      {
+        id: 20,
+        difficulty: "ยาก (บูรณาการ)",
+        system: "2.3 & 2.4 ภาพรวมสิ่งมีชีวิต",
+        icon: "🌍",
+        question: "เมื่อสภาพแวดล้อมเปลี่ยนแปลงอย่างรุนแรง สิ่งมีชีวิตกลุ่มใดมีโอกาสรอดชีวิตและปรับตัวได้ดีกว่ากัน เพราะเหตุใด?",
+        options: [
+          "สิ่งมีชีวิตที่สืบพันธุ์แบบอาศัยเพศ เพราะมีความหลากหลายทางพันธุกรรม",
+          "สิ่งมีชีวิตที่สืบพันธุ์แบบไม่อาศัยเพศ เพราะลูกมีลักษณะเหมือนพ่อแม่ทุกประการ",
+          "สิ่งมีชีวิตที่สืบพันธุ์แบบไม่อาศัยเพศ เพราะไม่มีเซลล์สืบพันธุ์ที่ซับซ้อน",
+          "ทั้งสองกลุ่มมีโอกาสรอดเท่ากัน เพราะยีนบนโครโมโซมไม่เปลี่ยนแปลง"
+        ],
+        correctIndex: 0,
+        rationale: "การสืบพันธุ์แบบอาศัยเพศก่อให้เกิดความหลากหลายทางพันธุกรรม ทำให้มีบางตัวที่มีลักษณะเหมาะสมและอยู่รอดได้เมื่อสิ่งแวดล้อมเปลี่ยนไป"
+      }
+    ];
+
+    // ==========================================
+    // 2. ตัวแปรสถานะเกม (Game State)
+    // ==========================================
+    let quizQuestions = [];
+    let currentIndex = 0;
+    let totalScore = 0;
+    let baseScoreTotal = 0;
+    let bonusScoreTotal = 0;
+    let correctCount = 0;
+    let streak = 0;
+
+    let timerInterval = null;
+    let timeLeft = 60;
+    const TIME_PER_QUESTION = 60;
+    let isAnswered = false;
+    let userHistory = [];
+    let cameraStream = null;
+    let isCameraActive = false;
+
+    // ==========================================
+    // 3. ฟังก์ชันสุ่ม (Fisher-Yates Shuffle)
+    // ==========================================
+    function shuffleArray(array) {
+      const arr = [...array];
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    // เตรียมข้อสอบ: สลับลำดับข้อ และสลับตัวเลือกในแต่ละข้อ
+    function prepareShuffledQuiz() {
+      const shuffledQs = shuffleArray(rawQuestions);
+      return shuffledQs.map((q) => {
+        const optionObjects = q.options.map((optText, idx) => ({
+          text: optText,
+          isCorrect: idx === q.correctIndex
+        }));
+        const shuffledOptions = shuffleArray(optionObjects);
+        return {
+          ...q,
+          shuffledOptions
+        };
+      });
+    }
+
+    // ==========================================
+    // 4. ระบบกล้อง AR (WebRTC Camera)
+    // ==========================================
+    async function enableARCamera() {
+      const videoEl = document.getElementById('ar-camera');
+      const virtualBg = document.getElementById('virtual-bg');
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment' },
+          audio: false
+        });
+        cameraStream = stream;
+        videoEl.srcObject = stream;
+        videoEl.classList.remove('hidden');
+        virtualBg.classList.add('hidden');
+        isCameraActive = true;
+      } catch (err) {
+        console.warn("ไม่สามารถเข้าถึงกล้องได้ ใช้พื้นหลัง AR จำลองแทน:", err);
+        videoEl.classList.add('hidden');
+        virtualBg.classList.remove('hidden');
+        isCameraActive = false;
+      }
+    }
+
+    function toggleARCamera() {
+      const videoEl = document.getElementById('ar-camera');
+      const virtualBg = document.getElementById('virtual-bg');
+      if (isCameraActive && cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream = null;
+        videoEl.classList.add('hidden');
+        virtualBg.classList.remove('hidden');
+        isCameraActive = false;
+      } else {
+        enableARCamera();
+      }
+    }
+
+    // ==========================================
+    // 5. การควบคุมหน้าจอและการเล่นเกม
+    // ==========================================
+    const startScreen = document.getElementById('start-screen');
+    const quizScreen = document.getElementById('quiz-screen');
+    const resultScreen = document.getElementById('result-screen');
+
+    function startQuiz(useCamera) {
+      if (useCamera) {
+        enableARCamera();
+      }
+      quizQuestions = prepareShuffledQuiz();
+      currentIndex = 0;
+      totalScore = 0;
+      baseScoreTotal = 0;
+      bonusScoreTotal = 0;
+      correctCount = 0;
+      streak = 0;
+      userHistory = [];
+
+      updateScoreUI();
+      startScreen.classList.add('hidden');
+      resultScreen.classList.add('hidden');
+      quizScreen.classList.remove('hidden');
+      quizScreen.classList.add('flex');
+
+      loadQuestion();
+    }
+
+    function loadQuestion() {
+      isAnswered = false;
+      clearInterval(timerInterval);
+      timeLeft = TIME_PER_QUESTION;
+
+      const q = quizQuestions[currentIndex];
+
+      // Update Header Info
+      document.getElementById('question-counter').textContent = `ข้อที่ ${currentIndex + 1} / ${quizQuestions.length}`;
+      
+      const diffBadge = document.getElementById('difficulty-badge');
+      diffBadge.textContent = `ระดับ: ${q.difficulty}`;
+      if (q.difficulty.includes('ง่าย')) {
+        diffBadge.className = "bg-emerald-500/20 border border-emerald-400/50 text-emerald-300 px-2.5 py-1 rounded-xl text-xs font-medium";
+      } else if (q.difficulty.includes('ปานกลาง')) {
+        diffBadge.className = "bg-amber-500/20 border border-amber-400/50 text-amber-300 px-2.5 py-1 rounded-xl text-xs font-medium";
+      } else {
+        diffBadge.className = "bg-rose-500/20 border border-rose-400/50 text-rose-300 px-2.5 py-1 rounded-xl text-xs font-medium";
+      }
+
+      // Update AR Hologram
+      document.getElementById('ar-hologram-icon').textContent = q.icon;
+      document.getElementById('ar-system-label').textContent = q.system;
+
+      // Update Question Text
+      document.getElementById('question-text').textContent = `${currentIndex + 1}. ${q.question}`;
+
+      // Render Options
+      const optionsContainer = document.getElementById('options-container');
+      optionsContainer.innerHTML = '';
+      const labels = ['ก', 'ข', 'ค', 'ง'];
+
+      q.shuffledOptions.forEach((opt, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'ar-option w-full text-left p-3.5 rounded-xl flex items-center gap-3 text-sm sm:text-base text-slate-100';
+        btn.innerHTML = `
+          <span class="w-7 h-7 rounded-lg bg-cyan-500/20 border border-cyan-400/50 text-cyan-300 font-bold flex items-center justify-center shrink-0 text-sm">
+            ${labels[idx]}
+          </span>
+          <span class="leading-snug">${opt.text}</span>
+        `;
+        btn.onclick = () => handleSelectOption(idx, btn);
+        optionsContainer.appendChild(btn);
+      });
+
+      // Hide Feedback
+      document.getElementById('feedback-area').classList.add('hidden');
+      const nextBtn = document.getElementById('btn-next');
+      nextBtn.textContent = (currentIndex === quizQuestions.length - 1) ? 'ดูสรุปผลคะแนน 🏆' : 'ข้อถัดไป ➡️';
+
+      startTimer();
+    }
+
+    function startTimer() {
+      updateTimerUI();
+      timerInterval = setInterval(() => {
+        timeLeft--;
+        updateTimerUI();
+        if (timeLeft <= 0) {
+          clearInterval(timerInterval);
+          handleTimeOut();
+        }
+      }, 1000);
+    }
+
+    function updateTimerUI() {
+      const timerText = document.getElementById('timer-text');
+      const timerBar = document.getElementById('timer-bar');
+      timerText.textContent = `${timeLeft} วินาที`;
+      const pct = (timeLeft / TIME_PER_QUESTION) * 100;
+      timerBar.style.width = `${pct}%`;
+
+      if (timeLeft <= 10) {
+        timerText.className = 'font-bold text-rose-400 animate-pulse';
+        timerBar.className = 'h-full bg-gradient-to-r from-rose-500 to-red-600 rounded-full transition-all duration-1000 ease-linear';
+      } else if (timeLeft <= 25) {
+        timerText.className = 'font-bold text-amber-300';
+        timerBar.className = 'h-full bg-gradient-to-r from-amber-400 to-orange-500 rounded-full transition-all duration-1000 ease-linear';
+      } else {
+        timerText.className = 'font-bold text-cyan-300';
+        timerBar.className = 'h-full bg-gradient-to-r from-emerald-400 via-cyan-400 to-blue-500 rounded-full transition-all duration-1000 ease-linear';
+      }
+    }
+
+    function handleSelectOption(selectedIdx, selectedBtn) {
+      if (isAnswered) return;
+      isAnswered = true;
+      clearInterval(timerInterval);
+
+      const q = quizQuestions[currentIndex];
+      const chosenOption = q.shuffledOptions[selectedIdx];
+      const isCorrect = chosenOption.isCorrect;
+
+      const allBtns = document.getElementById('options-container').querySelectorAll('button');
+      allBtns.forEach((btn, idx) => {
+        btn.disabled = true;
+        if (q.shuffledOptions[idx].isCorrect) {
+          btn.classList.remove('ar-option');
+          btn.classList.add('bg-emerald-600/80', 'border-2', 'border-emerald-300', 'text-white', 'font-semibold');
+        } else if (idx === selectedIdx && !isCorrect) {
+          btn.classList.remove('ar-option');
+          btn.classList.add('bg-rose-600/80', 'border-2', 'border-rose-300', 'text-white');
+        } else {
+          btn.classList.add('opacity-50');
+        }
+      });
+
+      let earnedBase = 0;
+      let earnedBonus = 0;
+
+      if (isCorrect) {
+        correctCount++;
+        streak++;
+        earnedBase = 100;
+        // โบนัสความเร็ว (สูงสุด 50 คะแนน) + โบนัส Combo ต่อเนื่อง (ข้อละ +10 สูงสุด 50)
+        const speedBonus = Math.round((timeLeft / TIME_PER_QUESTION) * 50);
+        const comboBonus = streak > 1 ? Math.min((streak - 1) * 10, 50) : 0;
+        earnedBonus = speedBonus + comboBonus;
+
+        baseScoreTotal += earnedBase;
+        bonusScoreTotal += earnedBonus;
+        totalScore += (earnedBase + earnedBonus);
+      } else {
+        streak = 0;
+      }
+
+      updateScoreUI();
+
+      // บันทึกประวัติ
+      const correctOptObj = q.shuffledOptions.find(o => o.isCorrect);
+      userHistory.push({
+        question: q.question,
+        userAnswer: chosenOption.text,
+        correctAnswer: correctOptObj.text,
+        isCorrect: isCorrect,
+        rationale: q.rationale
+      });
+
+      showFeedback(isCorrect, false, earnedBase, earnedBonus, q.rationale);
+    }
+
+    function handleTimeOut() {
+      if (isAnswered) return;
+      isAnswered = true;
+      streak = 0;
+      updateScoreUI();
+
+      const q = quizQuestions[currentIndex];
+      const allBtns = document.getElementById('options-container').querySelectorAll('button');
+      allBtns.forEach((btn, idx) => {
+        btn.disabled = true;
+        if (q.shuffledOptions[idx].isCorrect) {
+          btn.classList.remove('ar-option');
+          btn.classList.add('bg-emerald-600/80', 'border-2', 'border-emerald-300', 'text-white');
+        } else {
+          btn.classList.add('opacity-50');
+        }
+      });
+
+      const correctOptObj = q.shuffledOptions.find(o => o.isCorrect);
+      userHistory.push({
+        question: q.question,
+        userAnswer: "หมดเวลา (ไม่ได้ตอบ)",
+        correctAnswer: correctOptObj.text,
+        isCorrect: false,
+        rationale: q.rationale
+      });
+
+      showFeedback(false, true, 0, 0, q.rationale);
+    }
+
+    function showFeedback(isCorrect, isTimeout, base, bonus, rationale) {
+      const feedbackArea = document.getElementById('feedback-area');
+      const feedbackBox = document.getElementById('feedback-box');
+      const feedbackTitle = document.getElementById('feedback-title');
+      const feedbackBonus = document.getElementById('feedback-bonus');
+      const feedbackRationale = document.getElementById('feedback-rationale');
+
+      feedbackArea.classList.remove('hidden');
+
+      if (isCorrect) {
+        feedbackBox.className = 'p-3.5 rounded-xl bg-emerald-950/80 border border-emerald-400/60';
+        feedbackTitle.className = 'font-bold text-base text-emerald-300 mb-0.5';
+        feedbackTitle.textContent = '✅ ถูกต้อง! ยอดเยี่ยมมาก';
+        feedbackBonus.classList.remove('hidden');
+        feedbackBonus.textContent = `✨ รับ +${base} คะแนนพื้นฐาน และโบนัส +${bonus} คะแนน (Combo x${streak})`;
+      } else if (isTimeout) {
+        feedbackBox.className = 'p-3.5 rounded-xl bg-amber-950/80 border border-amber-400/60';
+        feedbackTitle.className = 'font-bold text-base text-amber-300 mb-0.5';
+        feedbackTitle.textContent = '⏰ หมดเวลา!';
+        feedbackBonus.classList.add('hidden');
+      } else {
+        feedbackBox.className = 'p-3.5 rounded-xl bg-rose-950/80 border border-rose-400/60';
+        feedbackTitle.className = 'font-bold text-base text-rose-300 mb-0.5';
+        feedbackTitle.textContent = '❌ ยังไม่ถูกต้อง';
+        feedbackBonus.classList.add('hidden');
+      }
+
+      feedbackRationale.textContent = `💡 คำอธิบาย: ${rationale}`;
+    }
+
+    function updateScoreUI() {
+      document.getElementById('score-display').textContent = totalScore.toLocaleString();
+      const comboBadge = document.getElementById('combo-badge');
+      if (streak >= 2) {
+        comboBadge.classList.remove('hidden');
+        comboBadge.textContent = `🔥 Combo x${streak}`;
+      } else {
+        comboBadge.classList.add('hidden');
+      }
+    }
+
+    function showResults() {
+      quizScreen.classList.add('hidden');
+      quizScreen.classList.remove('flex');
+      resultScreen.classList.remove('hidden');
+      resultScreen.classList.add('flex');
+
+      document.getElementById('final-total-score').textContent = totalScore.toLocaleString();
+      document.getElementById('stat-correct').textContent = `${correctCount} / ${quizQuestions.length}`;
+      document.getElementById('stat-base').textContent = baseScoreTotal.toLocaleString();
+      document.getElementById('stat-bonus').textContent = `+${bonusScoreTotal.toLocaleString()}`;
+
+      // Rank & Medal
+      const medalEl = document.getElementById('result-medal');
+      const rankEl = document.getElementById('result-rank');
+      if (correctCount >= 17) {
+        medalEl.textContent = '👑';
+        rankEl.textContent = 'ระดับปรมาจารย์ชีววิทยา (พร้อมพิชิตสนามสอบ O-NET!)';
+      } else if (correctCount >= 13) {
+        medalEl.textContent = '🏆';
+        rankEl.textContent = 'ระดับยอดเยี่ยม (เข้าใจความสัมพันธ์ของระบบร่างกายได้ดีมาก)';
+      } else if (correctCount >= 9) {
+        medalEl.textContent = '🥈';
+        rankEl.textContent = 'ระดับผ่านเกณฑ์ (ทบทวนจุดวิเคราะห์อีกนิดจะเก่งขึ้นแน่นอน)';
+      } else {
+        medalEl.textContent = '🔬';
+        rankEl.textContent = 'นักสำรวจมือใหม่ (ลองทบทวนคำอธิบายด้านล่างแล้วลุยใหม่อีกครั้งนะ!)';
+      }
+
+      // Render Review List
+      const reviewList = document.getElementById('review-list');
+      reviewList.innerHTML = '';
+      userHistory.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = `p-3 rounded-xl border ${item.isCorrect ? 'bg-emerald-950/40 border-emerald-500/40' : 'bg-rose-950/40 border-rose-500/40'}`;
+        div.innerHTML = `
+          <div class="font-semibold text-white mb-1">${index + 1}. ${item.question}</div>
+          <div class="${item.isCorrect ? 'text-emerald-300' : 'text-rose-300'}">
+            คำตอบของคุณ: ${item.userAnswer} ${item.isCorrect ? '✅' : '❌'}
+          </div>
+          ${!item.isCorrect ? `<div class="text-emerald-300 mt-0.5">คำตอบที่ถูก: ${item.correctAnswer}</div>` : ''}
+          <div class="text-slate-300 mt-1 text-[11px]">💡 ${item.rationale}</div>
+        `;
+        reviewList.appendChild(div);
+      });
+    }
+
+    // Event Listeners
+    document.getElementById('btn-start-ar').addEventListener('click', () => startQuiz(true));
+    document.getElementById('btn-start-virtual').addEventListener('click', () => startQuiz(false));
+    document.getElementById('btn-toggle-cam').addEventListener('click', toggleARCamera);
+    document.getElementById('btn-next').addEventListener('click', () => {
+      if (currentIndex < quizQuestions.length - 1) {
+        currentIndex++;
+        loadQuestion();
+      } else {
+        showResults();
+      }
+    });
+    document.getElementById('btn-restart').addEventListener('click', () => startQuiz(isCameraActive));
+  </script>
+</body>
+</html>
